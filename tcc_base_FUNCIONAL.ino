@@ -1,20 +1,19 @@
-#include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h> // Display OLED
+#include <Adafruit_SSD1306.h>  // Display OLED
 
-#include <ESP32Servo.h> // Servos
+#include <ESP32Servo.h>  // Servos
 
-#include <time.h> // Horario
+#include <time.h>  // Horario
 
-#include <EEPROM.h> // Guardar user
+#include <EEPROM.h>  // Guardar user
 
-#include <WiFiManager.h> //Biblioteca de Conectividade
+#include <WiFiManager.h>  //Biblioteca de Conectividade
 
 #include <ArduinoJson.h>
-#include <HTTPClient.h> // Blibliotecas de Comunicação
+#include <HTTPClient.h>  // Blibliotecas de Comunicação
 
-#define EEPROM_SIZE 32 // EEPROM endereços max. 512
+#define EEPROM_SIZE 32  // EEPROM endereços max. 512
 
 #define TOUCH_EEPROM 14
 #define TOUCH_WM 4
@@ -23,10 +22,10 @@ unsigned long lastMinutes[5];
 unsigned long intervalo[5];
 bool estado[5];
 
-int antTime = 0; // Tempo inicial Leitura
+int antTime = 0;  // Tempo inicial Leitura
 int interval = 6000;
 
-WiFiServer server(3333); // Porta qualquer acima de 1024
+WiFiServer server(3333);  // Porta qualquer acima de 1024
 WiFiClient client;
 
 const char wifiSSID[20] = "MedicaBox";
@@ -45,22 +44,22 @@ String copyNames[5];
 
 bool areEqual = true;
 
-int leds[5] = {12, 13, 5, 23, 19};
+int leds[5] = { 12, 13, 5, 23, 19 };
 
-Adafruit_SSD1306 display(256,64,&Wire,-1);
+Adafruit_SSD1306 display(256, 64, &Wire, -1);
 
 float configSensor(int echo, int trig) {
-// Gera um pulso de 50ms no pino de trigger
+  // Gera um pulso de 50ms no pino de trigger
   digitalWrite(trig, 0);
   delay(20);
   digitalWrite(trig, 1);
   delay(50);
   digitalWrite(trig, 0);
 
-// Mede o tempo de duração do pulso de eco
+  // Mede o tempo de duração do pulso de eco
   int duration = pulseIn(echo, 1);
 
-// Calcula a distância em centímetros
+  // Calcula a distância em centímetros
   float distance = duration * 0.034 / 2;
 
   return distance;
@@ -73,8 +72,8 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay();
 
-  pinMode(leds[4],OUTPUT);
-  digitalWrite(leds[4],0);
+  pinMode(leds[4], OUTPUT);
+  digitalWrite(leds[4], 0);
 
   floors[0].attach(1);
   floors[1].attach(2);
@@ -94,7 +93,7 @@ void setup() {
     Serial.println("Aguardando sincronização do tempo...");
   }
 
-} // Função setup (só ocorre no acionamento do ESP32, ligando ele na tomada)
+}  // Função setup (só ocorre no acionamento do ESP32, ligando ele na tomada)
 
 void loop() {
   if (user == "") {
@@ -108,10 +107,10 @@ void loop() {
   if (getLocalTime(&timeinfo)) {
     int HrAtual = timeinfo.tm_hour * 3600 + timeinfo.tm_min * 60;
     //Serial.println(HrAtual);
-    for (int i = 0; i < 5; i++) {       // percorre as linhas
-      for (int j = 0; j < 5; j++) {     // percorre as colunas
+    for (int i = 0; i < 5; i++) {    // percorre as linhas
+      for (int j = 0; j < 5; j++) {  // percorre as colunas
         if (belts[i][j] != copyBelts[i][j]) {
-          if(names[i] != "null"){
+          if (names[i] != "null") {
             calcTime(i, HrAtual);
             areEqual = false;
             break;  // sai do loop interno (colunas)
@@ -121,27 +120,27 @@ void loop() {
     }
     for (int i = 0; i < 5; i++) {
       if (names[i] != "null") {
-        configTimeFloors(i,HrAtual);
+        configTimeFloors(i, HrAtual);
       }
     }
   }
 
-  wmCancel(); // Esquecer WiFi
+  wmCancel();  // Esquecer WiFi
 
-  eepromCancel(); // Trocar user
+  eepromCancel();  // Trocar user
 
-  if(!areEqual) {
+  if (!areEqual) {
     for (int i = 0; i < 5; i++) {
       for (int j = 0; j < 5; j++) {
-          if (i < 5 && j < 5) { // segurança redundante
-              copyBelts[i][j] = belts[i][j];
-          }
+        if (i < 5 && j < 5) {  // segurança redundante
+          copyBelts[i][j] = belts[i][j];
+        }
       }
       copyNames[i] = names[i];
     }
     areEqual = true;
-  } // "Se o antigo for diferente do novo..."
-} // Função loop, acontece em loop né porra '-'
+  }  // "Se o antigo for diferente do novo..."
+}  // Função loop, acontece em loop né porra '-'
 
 void calcTime(int belt, int hr_atual) {
   int TIHour = belts[belt][0];
@@ -168,7 +167,7 @@ void configTimeFloors(int belt, int hr_atual) {
 
     lastMinutes[belt] += intervalo[belt];  // avança para a próxima dose
   }
-} // Configuração de horários
+}  // Configuração de horários
 
 void readTime() {
   unsigned long timeNow = millis();
@@ -245,26 +244,26 @@ void getBeltInfos(int belt) {
     }
   }
   http.end();
-} // Dados das Esteiras
+}  // Dados das Esteiras
 
 void setConfigBox() {
-  createSoftOne();  
+  createSoftOne();
   while (user == "") {
     conectUser();
   }
 
   WiFi.softAPdisconnect(true);
-  
+
   Serial.println("User recebido: " + user);
-  EEPROM.writeString(0, user); // EEPROM.writeString(endereço, variável);
-  EEPROM.commit(); // Grava na EEPROM
-} // Configurar caixa
+  EEPROM.writeString(0, user);  // EEPROM.writeString(endereço, variável);
+  EEPROM.commit();              // Grava na EEPROM
+}  // Configurar caixa
 
 void createSoftOne() {
   WiFi.softAP("Envio", "Medic");  // Modo AP
   server.begin();
-  Serial.println ("Nome da rede: Envio");
-  Serial.println ("Senha da rede: Medicamentos");
+  Serial.println("Nome da rede: Envio");
+  Serial.println("Senha da rede: Medicamentos");
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0, 0);
@@ -300,18 +299,18 @@ void conectUser() {
     user = doc["uid"].as<String>();
 
     client.stop();  // Fecha a conexão
-    Serial.println("Cliente desconectado"); 
+    Serial.println("Cliente desconectado");
   }
-} // Recebimento do UID
+}  // Recebimento do UID
 
 void wmConnect() {
   wm.setConnectTimeout(10);
   bool res;
 
   wm.setConfigPortalBlocking(false);
-  res = wm.autoConnect(wifiSSID,wifiPASS);
+  res = wm.autoConnect(wifiSSID, wifiPASS);
 
-  if(!res) {
+  if (!res) {
     Serial.println("Falha ao Conectar");
 
     Serial.print("Wifi: ");
@@ -321,18 +320,18 @@ void wmConnect() {
     Serial.print("IP: ");
     Serial.println(WiFi.softAPIP());
 
-    while(WiFi.status() != WL_CONNECTED) {
+    while (WiFi.status() != WL_CONNECTED) {
       wm.process();
     }
   }
-} 
+}
 void wmCancel() {
-  if(touchRead(TOUCH_WM) <= 20) {
+  if (touchRead(TOUCH_WM) <= 20) {
     wm.resetSettings();
     Serial.println("Configurações Reiniciadas");
     wmConnect();
   }
-}// Conexão
+}  // Conexão
 
 void eepromCancel() {
   if (touchRead(TOUCH_EEPROM) <= 20) {
@@ -342,4 +341,4 @@ void eepromCancel() {
     EEPROM.commit();
     Serial.println("EEPROM Reiniciada");
   }
-} // Limpeza do User
+}  // Limpeza do User

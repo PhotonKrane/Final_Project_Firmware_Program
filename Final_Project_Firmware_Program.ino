@@ -67,7 +67,7 @@ String copyNames[5];
 
 bool areEqual = true;
 
-float max_dis = 2.7;
+float max_dis = 2.9;
 
 int default_hall_min = 1850;
 int default_hall_max = 1910;
@@ -611,3 +611,4 @@ void eepromCancel() {
     delay(3000);
   }
 }  // Limpeza do User
+

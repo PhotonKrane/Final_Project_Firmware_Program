@@ -318,7 +318,7 @@ void updateFloorState(int floor) {
           floors[floor].write(stopAngles[floor]);
           floorStates[floor] = RETURNING;
           floorTimers[floor] = millis();
-          display.fillScreen(ST77XX_WHITE);
+          display.fillRect(0, 0, 240, 60, ST77XX_WHITE);
         }
       }
       Serial.print("Sensor Hall -> ");
@@ -625,4 +625,5 @@ void eepromCancel() {
     delay(3000);
   }
 }  // Limpeza do User
+
 

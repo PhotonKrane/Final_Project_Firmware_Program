@@ -1,6 +1,6 @@
 #include <Adafruit_ST7789.h>
-#include <SPI.h>
-#include <Adafruit_GFX.h>  // Display OLED
+#include <Adafruit_GFX.h>
+#include <SPI.h>  // Display OLED
 
 #include <ESP32Servo.h>  // Servos
 
@@ -68,31 +68,20 @@ String copyNames[5];
 bool areEqual = true;
 
 float max_dis = 2.9;
+int timerSensor = 0;
 
-int default_hall_min[5] = { 1850, 1900, -1, -1, -1 };
-int default_hall_max[5] = { 1910, 1960, -1, -1, -1 } ;
-int activeAngles[5] = { 1522, 1550, 90, 0, 0 };
-int stopAngles[5] = { 1480, 1500, 91, 0, 0 };
+int default_hall_min[5] = { 1850, 1900, 1800, -1, -1 };
+int default_hall_max[5] = { 1910, 1960, 2250, -1, -1 } ;
+int activeAngles[5] = { 1522, 1535, 1525, 0, 0 };
+int stopAngles[5] = { 1480, 1500, 1500, 0, 0 };
 
 int leds[5] = { 36, 35, 16, -1, -1 };
-int hall[5] = { 4, 5, -1, -1, -1 };
+int hall[5] = { 4, 5, 6, -1, -1 };
 
 const int NUM_PHYSICAL_FLOORS = 3;
 
 Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 int estadoDisplay = -1;
-
-float configSensor(int ec, int tr) {
-  digitalWrite(tr, LOW);
-  delayMicroseconds(2);
-  digitalWrite(tr, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(tr, LOW);
-
-  long duration = pulseIn(ec, HIGH, 5000);
-  float distance = duration * 0.034 / 2;
-  return distance;
-}
 
 void setup() {
   EEPROM.begin(EEPROM_SIZE);
@@ -123,6 +112,7 @@ void setup() {
     digitalWrite(leds[i], 0);
   }
   pinMode(trig, OUTPUT);
+  digitalWrite(trig, 0);
   pinMode(echo, INPUT);
   pinMode(led_push, OUTPUT);
   digitalWrite(led_push, 0);
@@ -131,9 +121,9 @@ void setup() {
 
   floors[0].attach(10, 1000, 2000);
   floors[1].attach(9, 1000, 2000);
-  floors[2].attach(-1);
+  floors[2].attach(12, 1000, 2000); 
 
-  for (int j = 0; j < 3; j++) {
+  for (int j = 0; j < NUM_PHYSICAL_FLOORS; j++) {
     floors[j].writeMicroseconds(stopAngles[j]);
   }
 
@@ -214,28 +204,24 @@ void loop() {
   struct tm timeinfo;
   if (getLocalTime(&timeinfo)) {
     unsigned long now = millis();
-    float dist = 0;
-    for(int i = 0; i < 20; i++) {
-      dist += configSensor(echo, trig);
-    }
-    dist = dist/20;
-
+    float dist = 1.5;
 
     if (dist > max_dis && estadoDisplay != 1) {  // Gaveta muito longe, risco de queda
       estadoDisplay = 1;
       Serial.println("GAVETA MUITO LONGE!");
       display.fillScreen(ST77XX_WHITE);
-      display.setCursor(0,0);
-      display.setTextSize(3);
+      display.setCursor(28,100);
+      display.setTextSize(2);
       display.setTextColor(display.color565(39, 55, 85));
       display.setTextWrap(true);
-      display.print("A gaveta nao esta no lugar!");
+      display.print("A gaveta fora do lugar");
 
       digitalWrite(led_push, 0);
       noTone(buzzer);
-      for(int floor = 0; floor < 3; floor++) {
+      for(int floor = 0; floor < NUM_PHYSICAL_FLOORS; floor++) {
         floors[floor].writeMicroseconds(stopAngles[floor]);
         digitalWrite(leds[floor], 0);
+        floorStates[floor] = IDLE;
       }
     }
 
@@ -244,11 +230,11 @@ void loop() {
       Serial.println("AHHHHHHHHHH!");
       digitalWrite(led_push, 0);
       display.fillScreen(ST77XX_WHITE);
-      display.setCursor(0,0);
-      display.setTextSize(3);
+      display.setCursor(10,100);
+      display.setTextSize(2);
       display.setTextColor(display.color565(131, 173, 230));
       display.setTextWrap(true);
-      display.print("Gaveta no lugar");
+      display.print("Esperando proxima dosagem");
     }
     
     if (dist < max_dis) {
@@ -296,6 +282,7 @@ void updateFloorState(int floor) {
   switch (floorStates[floor]) {
     case DISPENSING:
       // Ativa o servo e LED
+      display.fillRect(0, 99, 320, 130, ST77XX_WHITE);
       Serial.println("Servo Ativo");
       floors[floor].writeMicroseconds(activeAngles[floor]);
       digitalWrite(leds[floor], 1);
@@ -314,16 +301,15 @@ void updateFloorState(int floor) {
 
       int readSensor = 0;
       if (hall[floor] != -1) {
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 10; i++) {
           readSensor += analogRead(hall[floor]);
         }
-        readSensor = readSensor / 100;
+        readSensor = readSensor / 10;
 
         if (readSensor < default_hall_min[floor] || readSensor > default_hall_max[floor]) {  //   Ímã detectado = ponto diviória
           floors[floor].writeMicroseconds(stopAngles[floor]);
           floorStates[floor] = RETURNING;
           floorTimers[floor] = millis();
-          display.fillRect(0, 0, 320, 60, ST77XX_WHITE);
         }
       }
       Serial.print("Sensor Hall -> ");
@@ -337,7 +323,7 @@ void updateFloorState(int floor) {
       digitalWrite(led_push, 1);
 
       display.setTextColor(display.color565(39, 55, 85));
-      display.setCursor(0, 100);
+      display.setCursor(16, 100);
       display.setTextSize(3);
       display.print("Hora do remedio!");
       unsigned long tempoMusica = millis() - floorTimers[floor];
@@ -448,6 +434,7 @@ void getBelts() {
   }
 }
 void getBeltInfos(int belt) {
+  if (temFloorAtivo()) return;
   const String firebaseHost = "https://firestore.googleapis.com/v1/projects/medicabox-50b65/databases/(default)/documents/users/";
   const String boxes = "/box/";
 
@@ -498,6 +485,7 @@ void getBeltInfos(int belt) {
 }  // Dados das Esteiras
 
 void setConfigBox() {
+  if (temFloorAtivo()) return;
   createSoftOne();
   while (user == "") {
     conectUser();
@@ -543,6 +531,7 @@ void createSoftOne() {
   display.print(WiFi.softAPIP());
 }
 void conectUser() {
+  if (temFloorAtivo()) return;
   client = server.available();
   if (client) {
     Serial.println("Cliente conectado");
@@ -568,7 +557,8 @@ void conectUser() {
 }  // Recebimento do UID
 
 void wmConnect() {
-  wm.setConnectTimeout(10);
+  if (temFloorAtivo()) return;
+  wm.setConnectTimeout(5);
   bool res;
 
   wm.setConfigPortalBlocking(false);
